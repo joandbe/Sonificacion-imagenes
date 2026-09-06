@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonificador de Imágenes - Pro Studio</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    :root {
+      --bg-dark: #000000;
+      --accent-purple: #572364;
+      --accent-purple-hover: #733085;
+      --neutral-grey: #9b9b9b;
+      --card-bg: #0d0d0d;
+      --text-light: #ffffff;
+      --border-color: #262626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .app-container {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-purple);
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 1100px;
+      width: 100%;
+      box-shadow: 0 0 30px rgba(87, 35, 100, 0.3);
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 850px) {
+      .app-container { grid-template-columns: 1fr; }
+    }
+
+    .sidebar { display: flex; flex-direction: column; gap: 1.2rem; }
+    .brand h1 { font-size: 1.5rem; font-weight: 700; color: var(--text-light); }
+    .brand p { font-size: 0.85rem; color: var(--neutral-grey); margin-top: 0.2rem; }
+
+    .control-group { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    input[type="file"] { display: none; }
+
+    .btn {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn-file { background: transparent; color: var(--neutral-grey); border-color: var(--neutral-grey); }
+    .btn-file:hover { background: rgba(155, 155, 155, 0.1); color: var(--text-light); }
+    
+    .btn-play { background: var(--accent-purple); color: var(--text-light); border-color: var(--accent-purple); }
+    .btn-play:hover:not(:disabled) { background: var(--accent-purple-hover); }
+    
+    .btn-stop { background: #330000; color: #ff6b6b; border-color: #660000; }
+    .btn-stop:hover:not(:disabled) { background: #4d0000; }
+    
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .section-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--neutral-grey);
+      margin-bottom: 0.5rem;
+    }
+
+    .presets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .btn-preset {
+      background: #181818;
+      border: 1px solid var(--border-color);
+      color: var(--neutral-grey);
+      padding: 0.5rem;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-preset:hover { border-color: var(--accent-purple); color: var(--text-light); }
+
+    .audio-controls {
+      background: #141414;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .slider-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .slider-group label { font-size: 0.8rem; color: var(--neutral-grey); display: flex; justify-content: space-between; }
+    
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-purple);
+      background: #262626;
+      cursor: pointer;
+    }
+
+    .dials-container { display: flex; justify-content: space-around; gap: 1rem; }
+    .dial-item { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+    .dial-item label { font-size: 0.75rem; color: var(--neutral-grey); }
+
+    .circle-container {
+      background: #141414;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .circle-header {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--neutral-grey);
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    .key-display { color: #ffffff; font-weight: bold; }
+
+    #circleSVG {
+      width: 180px;
+      height: 180px;
+      cursor: pointer;
+    }
+
+    .sector {
+      fill: var(--neutral-grey);
+      stroke: var(--bg-dark);
+      stroke-width: 1.5;
+      transition: fill 0.2s;
+    }
+
+    .sector:hover {
+      fill: var(--accent-purple-hover);
+    }
+
+    .sector.active {
+      fill: var(--accent-purple);
+    }
+
+    .label-text {
+      font-size: 10px;
+      font-weight: 700;
+      fill: #000000;
+      pointer-events: none;
+      user-select: none;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    .label-text.active-text {
+      fill: #ffffff;
+    }
+
+    .viewport {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .canvas-wrapper {
+      position: relative;
+      background: #050505;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--accent-purple);
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas { display: block; max-width: 100%; height: auto; }
+
+    #scanLine {
+      position: absolute; top: 0; bottom: 0; width: 2px;
+      background: var(--neutral-grey);
+      box-shadow: 0 0 10px var(--neutral-grey), 0 0 20px var(--accent-purple);
+      display: none; pointer-events: none;
+    }
+
+    .status-text { margin-top: 1rem; font-size: 0.85rem; color: var(--neutral-grey); text-align: center; }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <div class="sidebar">
+    <div class="brand">
+      <h1>Sonificador RGB</h1>
+      <p>Síntesis visual interactiva</p>
+    </div>
+
+    <div class="control-group">
+      <label class="btn btn-file">
+        📁 Cargar Imagen Local
+        <input type="file" id="imageInput" accept="image/*">
+      </label>
+      <button id="playBtn" class="btn btn-play" disabled>▶ Iniciar Sonificación</button>
+      <button id="stopBtn" class="btn btn-stop" disabled>⏹ Detener</button>
+    </div>
+
+    <div>
+      <div class="section-title">Imágenes de Prueba</div>
+      <div class="presets-grid">
+        <button class="btn-preset" onclick="loadPreset('JjAaZz')">JjAaZz</button>
+        <button class="btn-preset" onclick="loadPreset('Abstract')">Abstract</button>
+        <button class="btn-preset" onclick="loadPreset('Rug')">Rug</button>
+      </div>
+    </div>
+
+    <div class="circle-container">
+      <div class="circle-header">
+        <span>Tonalidad</span>
+        <span id="currentKeyText" class="key-display">C Mayor</span>
+      </div>
+      <svg id="circleSVG" viewBox="-110 -110 220 220"></svg>
+    </div>
+
+    <div class="audio-controls">
+      <div class="section-title">Parámetros de Audio</div>
+      <div class="slider-group">
+        <label>Ganancia General <span id="gainVal">0 dB</span></label>
+        <input type="range" id="gainSlider" min="-30" max="6" value="0" step="1">
+      </div>
+      <div class="dials-container">
+        <div class="dial-item">
+          <label>Filtro LPF</label>
+          <input type="range" id="filterDial" min="200" max="8000" value="3000" step="50" style="width: 80px;">
+        </div>
+        <div class="dial-item">
+          <label>Mezcla Reverb</label>
+          <input type="range" id="reverbDial" min="0" max="1" value="0.3" step="0.05" style="width: 80px;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="viewport">
+    <div class="canvas-wrapper">
+      <canvas id="canvas"></canvas>
+      <div id="scanLine"></div>
+    </div>
+    <div class="status-text" id="statusText">Selecciona una imagen de prueba o sube la tuya.</div>
+  </div>
+</div>
+
+<script>
+  const imageInput = document.getElementById('imageInput');
+  const playBtn = document.getElementById('playBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const scanLine = document.getElementById('scanLine');
+  const statusText = document.getElementById('statusText');
+
+  const gainSlider = document.getElementById('gainSlider');
+  const gainVal = document.getElementById('gainVal');
+  const filterDial = document.getElementById('filterDial');
+  const reverbDial = document.getElementById('reverbDial');
+  const circleSVG = document.getElementById('circleSVG');
+  const currentKeyText = document.getElementById('currentKeyText');
+
+  let activeImage = null;
+  let isPlaying = false;
+  let timerId = null;
+  let currentX = 0;
+
+  const fifthsData = [
+    { major: "C", minor: "a", root: "C", type: "major" },
+    { major: "G", minor: "e", root: "G", type: "major" },
+    { major: "D", minor: "b", root: "D", type: "major" },
+    { major: "A", minor: "f#", root: "A", type: "major" },
+    { major: "E", minor: "c#", root: "E", type: "major" },
+    { major: "B", minor: "g#", root: "B", type: "major" },
+    { major: "F#", minor: "d#", root: "F#", type: "major" },
+    { major: "Db", minor: "bb", root: "Db", type: "major" },
+    { major: "Ab", minor: "f", root: "Ab", type: "major" },
+    { major: "Eb", minor: "c", root: "Eb", type: "major" },
+    { major: "Bb", minor: "g", root: "Bb", type: "major" },
+    { major: "F", minor: "d", root: "F", type: "major" }
+  ];
+
+  const scaleIntervals = {
+    major: [0, 2, 4, 5, 7, 9, 11],
+    minor: [0, 2, 3, 5, 7, 8, 10]
+  };
+
+  const noteNames = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+  const noteAliases = { "Db": "C#", "D#": "Eb", "Gb": "F#", "G#": "Ab", "A#": "Bb", "a": "A", "e": "E", "b": "B", "f#": "F#", "c#": "C#", "g#": "G#", "d#": "D#", "bb": "Bb", "f": "F", "c": "C", "g": "G", "d": "D" };
+
+  let currentScaleNotes = [];
+
+  function generateScale(root, type) {
+    const cleanRoot = noteAliases[root] || root;
+    let rootIdx = noteNames.indexOf(cleanRoot);
+    if (rootIdx === -1) rootIdx = 0;
+    
+    const intervals = scaleIntervals[type];
+    const notes = [];
+    
+    [2, 3, 4, 5].forEach(octave => {
+      intervals.forEach(i => {
+        const noteIdx = (rootIdx + i) % 12;
+        const octOffset = Math.floor((rootIdx + i) / 12);
+        notes.push(`${noteNames[noteIdx]}${octave + octOffset}`);
+      });
+    });
+    return notes;
+  }
+
+  function drawCircleOfFifths() {
+    circleSVG.innerHTML = '';
+    const angleStep = (2 * Math.PI) / 12;
+
+    fifthsData.forEach((item, index) => {
+      const startAngle = index * angleStep - Math.PI / 2 - angleStep / 2;
+      const endAngle = startAngle + angleStep;
+
+      createSectorPath(startAngle, endAngle, 65, 100, item.major, item.root, "major", index);
+      createSectorPath(startAngle, endAngle, 30, 65, item.minor, item.minor, "minor", index);
+    });
+
+    selectKey("C", "major", 0, "C");
+  }
+
+  function createSectorPath(startAngle, endAngle, innerR, outerR, label, root, type, index) {
+    const x1 = outerR * Math.cos(startAngle), y1 = outerR * Math.sin(startAngle);
+    const x2 = outerR * Math.cos(endAngle),   y2 = outerR * Math.sin(endAngle);
+    const x3 = innerR * Math.cos(endAngle),   y3 = innerR * Math.sin(endAngle);
+    const x4 = innerR * Math.cos(startAngle), y4 = innerR * Math.sin(startAngle);
+
+    const d = `M ${x1} ${y1} A ${outerR} ${outerR} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${innerR} ${innerR} 0 0 0 ${x4} ${y4} Z`;
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "sector");
+    path.dataset.key = `${root}-${type}`;
+
+    const midAngle = (startAngle + endAngle) / 2;
+    const midR = (innerR + outerR) / 2;
+    const textX = midR * Math.cos(midAngle);
+    const textY = midR * Math.sin(midAngle);
+
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", textX);
+    text.setAttribute("y", textY);
+    text.setAttribute("class", "label-text");
+    text.textContent = label;
+
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.appendChild(path);
+    group.appendChild(text);
+
+    group.addEventListener("click", () => {
+      selectKey(label, type, index, root);
+    });
+
+    circleSVG.appendChild(group);
+  }
+
+  function selectKey(label, type, index, root) {
+    document.querySelectorAll('.sector').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.label-text').forEach(t => t.classList.remove('active-text'));
+
+    const activeGroup = circleSVG.children[index * 2 + (type === 'major' ? 0 : 1)];
+    if (activeGroup) {
+      activeGroup.querySelector('.sector').classList.add('active');
+      activeGroup.querySelector('.label-text').classList.add('active-text');
+    }
+
+    currentKeyText.textContent = `${label} ${type === 'major' ? 'Mayor' : 'Menor'}`;
+    currentScaleNotes = generateScale(root, type);
+  }
+
+  const masterGain = new Tone.Volume(0).toDestination();
+  const filter = new Tone.Filter(3000, "lowpass").connect(masterGain);
+  const reverb = new Tone.Freeverb({ roomSize: 0.5, wet: 0.3 }).connect(filter);
+  const chorus = new Tone.Chorus({ frequency: 2, delayTime: 3.5, depth: 0.7, wet: 0.2 }).connect(reverb).start();
+  
+  const synth = new Tone.Synth({
+    oscillator: { type: 'triangle' },
+    envelope: { attack: 0.01, decay: 0.2, sustain: 0.3, release: 0.5 }
+  }).connect(chorus);
+
+  gainSlider.addEventListener('input', (e) => {
+    masterGain.volume.value = e.target.value;
+    gainVal.textContent = `${e.target.value} dB`;
+  });
+
+  filterDial.addEventListener('input', (e) => { filter.frequency.value = e.target.value; });
+  reverbDial.addEventListener('input', (e) => { reverb.wet.value = e.target.value; });
+
+  const presets = { 
+    JjAaZz: "JjAaZz.jpg", 
+    Abstract: "Abstract.jpg", 
+    Rug: "Rug.jpg" 
+  };
+
+  function cropAndDraw(sourceImg) {
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = sourceImg.width; 
+    tempCanvas.height = sourceImg.height;
+    tempCtx.drawImage(sourceImg, 0, 0);
+
+    const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+    const data = imgData.data;
+    let left = 0, right = tempCanvas.width;
+
+    const isNotBlack = (r, g, b, a) => (r > 15 || g > 15 || b > 15) && a > 10;
+
+    leftScan: for (let x = 0; x < tempCanvas.width; x++) {
+      for (let y = 0; y < tempCanvas.height; y++) {
+        const i = (y * tempCanvas.width + x) * 4;
+        if (isNotBlack(data[i], data[i+1], data[i+2], data[i+3])) { left = x; break leftScan; }
+      }
+    }
+
+    rightScan: for (let x = tempCanvas.width - 1; x >= left; x--) {
+      for (let y = 0; y < tempCanvas.height; y++) {
+        const i = (y * tempCanvas.width + x) * 4;
+        if (isNotBlack(data[i], data[i+1], data[i+2], data[i+3])) { right = x + 1; break rightScan; }
+      }
+    }
+
+    const cropWidth = Math.max(1, right - left);
+    const maxDim = 500;
+    let finalW = cropWidth, finalH = tempCanvas.height;
+
+    if (finalW > maxDim || finalH > maxDim) {
+      if (finalW > finalH) { finalH = Math.round((finalH * maxDim) / finalW); finalW = maxDim; }
+      else { finalW = Math.round((finalW * maxDim) / finalH); finalH = maxDim; }
+    }
+
+    canvas.width = finalW; 
+    canvas.height = finalH;
+    ctx.drawImage(sourceImg, left, 0, cropWidth, sourceImg.height, 0, 0, finalW, finalH);
+    
+    playBtn.disabled = false;
+    statusText.textContent = "Imagen lista. Haz clic en ▶ Iniciar Sonificación.";
+  }
+
+  function loadPreset(key) {
+    if (isPlaying) stopBtn.click();
+    
+    const fileName = presets[key];
+    if (!fileName) {
+      statusText.textContent = "Error: Preset no válido.";
+      return;
+    }
+
+    statusText.textContent = `Cargando preset ${fileName}...`;
+    
+    activeImage = new Image();
+    activeImage.crossOrigin = "anonymous";
+    activeImage.onload = () => cropAndDraw(activeImage);
+    activeImage.onerror = () => { 
+      statusText.textContent = `Error al cargar '${fileName}'.`; 
+    };
+    activeImage.src = fileName;
+  }
+
+  imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (isPlaying) stopBtn.click();
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      activeImage = new Image();
+      activeImage.onload = () => cropAndDraw(activeImage);
+      activeImage.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function playColumn(x) {
+    const imageData = ctx.getImageData(x, 0, 1, canvas.height);
+    const data = imageData.data;
+    let sumR = 0, sumG = 0, sumB = 0;
+    const sampleCount = Math.floor(canvas.height / 4);
+
+    for (let y = 0; y < canvas.height; y += 4) {
+      const idx = y * 4;
+      sumR += data[idx]; sumG += data[idx + 1]; sumB += data[idx + 2];
+    }
+
+    const avgR = Math.round(sumR / sampleCount);
+    const avgG = Math.round(sumG / sampleCount);
+    const avgB = Math.round(sumB / sampleCount);
+
+    const normR = avgR / 255;
+    const noteIdx = Math.floor(normR * (currentScaleNotes.length - 1));
+    const noteToPlay = currentScaleNotes[noteIdx];
+
+    const normG = avgG / 255;
+    const volumeGain = 0.15 + (normG * 0.85);
+
+    const normB = avgB / 255;
+    chorus.wet.value = normB;
+
+    synth.triggerAttackRelease(noteToPlay, "16n", undefined, volumeGain);
+  }
+
+  function stepScan() {
+    if (!isPlaying) return;
+    playColumn(currentX);
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / canvas.width;
+    scanLine.style.left = `${currentX * scaleX}px`;
+
+    currentX = (currentX + 1) % canvas.width;
+    timerId = setTimeout(stepScan, 60);
+  }
+
+  playBtn.addEventListener('click', async () => {
+    await Tone.start();
+    isPlaying = true;
+    currentX = 0;
+    playBtn.disabled = true;
+    stopBtn.disabled = false;
+    scanLine.style.display = 'block';
+    statusText.textContent = "Reproduciendo sonificación...";
+    stepScan();
+  });
+
+  stopBtn.addEventListener('click', () => {
+    isPlaying = false;
+    if (timerId) clearTimeout(timerId);
+    playBtn.disabled = false;
+    stopBtn.disabled = true;
+    scanLine.style.display = 'none';
+    statusText.textContent = "Reproducción detenida.";
+  });
+
+  drawCircleOfFifths();
+</script>
+
+</body>
+</html>
